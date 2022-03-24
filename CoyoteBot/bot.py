@@ -23,7 +23,7 @@ from mybots_utils.mybots_rewards import *
 if __name__ == '__main__':  # Required for multiprocessing
     frame_skip = 8  # Number of ticks to repeat an action
     # TODO maybe the action can instead be as an array [start,stop] from [0,7] or just [2,2]
-
+    # testing
     fps = 120 / frame_skip
     gamma = 0.99
     gae_lambda = 0.95
