@@ -1,11 +1,10 @@
 import rlgym
-from mybots_utils import mybots_rewards
-from rlgym.utils.terminal_conditions.common_conditions import TimeoutCondition, GoalScoredCondition
-from rlgym.utils.gamestates import GameState, PlayerData
+from CoyoteBot.mybots_utils import mybots_rewards
+from rlgym.utils.terminal_conditions.common_conditions import TimeoutCondition
 
 env = rlgym.make(terminal_conditions=TimeoutCondition(round((120/8) * 30)),
                  reward_fn=mybots_rewards.OnWall(),
-                 game_speed=1,)
+                 game_speed=1, )
 try:
     while True:
         obs = env.reset()
