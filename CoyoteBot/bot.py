@@ -9,7 +9,7 @@ from rlgym.utils.obs_builders import AdvancedObs
 from rlgym.utils.state_setters import DefaultState
 from rlgym.utils.terminal_conditions.common_conditions import TimeoutCondition, GoalScoredCondition
 from rlgym_tools.sb3_utils import SB3MultipleInstanceEnv
-from rlgym.utils.reward_functions.common_rewards.misc_rewards import EventReward
+from rlgym.utils.reward_functions.common_rewards.misc_rewards import *
 from rlgym.utils.reward_functions.common_rewards.misc_rewards import SaveBoostReward
 from rlgym.utils.reward_functions.common_rewards.player_ball_rewards import VelocityPlayerToBallReward
 from rlgym.utils.reward_functions.common_rewards.ball_goal_rewards import VelocityBallToGoalReward
@@ -18,6 +18,8 @@ from rlgym.utils.reward_functions import CombinedReward
 from mybots_utils.mybots_rewards import *
 
 from os.path import exists
+
+from torch.nn import ReLU
 
 if __name__ == '__main__':  # Required for multiprocessing
     frame_skip = 8  # Number of ticks to repeat an action
@@ -33,8 +35,8 @@ if __name__ == '__main__':  # Required for multiprocessing
     ent_coef = 0.01
     vf_coef = 1.
     target_steps = 6_000_000  # steps to do per rollout
-    agents_per_match = 2
-    num_instances = 1
+    agents_per_match = 6
+    num_instances = 10
     steps = target_steps // (num_instances * agents_per_match)
     batch_size = steps // 5
     n_bins = 101
@@ -49,25 +51,28 @@ if __name__ == '__main__':  # Required for multiprocessing
             tick_skip=frame_skip,
             reward_function=CombinedReward(
                 (
-                    # TODO avoid demos
-                    AboveCrossbar(),
-                    OnWall(),
-                    SaveBoostReward(),
+                    # TODO anneal when adding complexity
+                    # TODO add team spirit
+                    # AboveCrossbar(),
+                    # OnWall(),
+                    # SaveBoostReward(),
                     # RewardIfBehindBall(),
+                    VelocityReward(),
                     VelocityPlayerToBallReward(),
                     VelocityBallToGoalReward(),
+                    # Demoed(),
                     EventReward(
                         team_goal=100.0,
-                        concede=-100.0,
-                        shot=5.0,
-                        save=100.0,
-                        demo=10.0,
+                        concede=0,  # add later
+                        shot=20.0,
+                        save=0,  # add later
+                        demo=0,  # add later
                     ),
                 ),
-                (0, 0, 0.125, 0.8, 1.0, 1.0)
+                (0.8, 0.5, 0.6, 1.0)
             ),
             self_play=True,
-            terminal_conditions=[TimeoutCondition(round(30 // t_step)), GoalScoredCondition()],  # Some basic terminals
+            terminal_conditions=[TimeoutCondition(round(30 // t_step)), GoalScoredCondition()],  # TODO lengthen later
             obs_builder=AdvancedObs(),  # Not that advanced, good default
             state_setter=DefaultState(),  # Resets to kickoff position
             action_parser=DiscreteAction(n_bins=n_bins)
@@ -89,21 +94,19 @@ if __name__ == '__main__':  # Required for multiprocessing
         model._last_obs = None
         print("Loaded previous exit_save model")
     else:
-        from torch.nn import Tanh
-
         policy_kwargs = dict(
-            activation_fn=Tanh,
-            net_arch=[512, 512, dict(pi=[256, 256, 256], vf=[256, 256, 256])],
+            activation_fn=ReLU,
+            net_arch=[512, dict(pi=[256, 256], vf=[512, 512])],
         )
-        model = PPO(
+        model = PPO( # TODO initialize with zero mean, low deviation, xavier?
             MlpPolicy,
             env,
-            n_epochs=n_epochs,  # PPO calls for multiple epochs
+            n_epochs=n_epochs,
             policy_kwargs=policy_kwargs,
-            learning_rate=learning_rate,  # Around this is fairly common for PPO
-            ent_coef=ent_coef,  # From PPO Atari
-            vf_coef=vf_coef,  # From PPO Atari
-            gamma=gamma,  # Gamma as calculated using half-life
+            learning_rate=learning_rate,
+            ent_coef=ent_coef,
+            vf_coef=vf_coef,
+            gamma=gamma,
             gae_lambda=gae_lambda,
             verbose=3,  # Print out all the info as we're going
             batch_size=batch_size,  # Batch size as high as possible within reason
@@ -111,6 +114,7 @@ if __name__ == '__main__':  # Required for multiprocessing
             tensorboard_log="logs",  # `tensorboard --logdir out/logs` in terminal to see graphs
             device="auto"  # Uses GPU if available
         )
+        # TODO figure out how to initialize
 
     # Save model every so often
     # Divide by num_envs (number of agents) because callback only increments every time all agents have taken a step

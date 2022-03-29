@@ -61,7 +61,12 @@ class OnWall(RewardFunction):
             reward = 0.2
         return reward
 
-# TODO: add a reward for avoiding an attempted demo
-#   if other team is supersonic, pointed towards me, and within some distance and we don't get
-#   demo'd eventually... how to do this?
+
+class Demoed(RewardFunction):
+    def reset(self, initial_state: GameState):
+        pass
+
+    def get_reward(self, player: PlayerData, state: GameState, previous_action: np.ndarray) -> float:
+        if player.is_demoed:
+            return 1
 
