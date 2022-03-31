@@ -16,7 +16,7 @@ from rlgym_tools.extra_rewards.distribute_rewards import DistributeRewards
 APRX_CROSSBAR_HEIGHT = 640
 
 
-class MyRewardFunction(RewardFunction):
+class MyRewardFunction(CombinedReward):
     def __init__(
             self,
             team_spirit=0.2,
@@ -46,16 +46,11 @@ class MyRewardFunction(RewardFunction):
         self.velocity_w = velocity_w
         self.velocity_pb_w = velocity_pb_w
         self.velocity_bg_w = velocity_bg_w
-        self.rewards = None
-
-    def reset(self, initial_state: GameState):
-        pass
-
-    def get_reward(self, player: PlayerData, state: GameState, previous_action: np.ndarray):
+        # self.rewards = None
         goal_reward = EventReward(goal=self.goal_w, concede=self.concede_w)
         distrib_reward = DistributeRewards(goal_reward, team_spirit=self.team_spirit)
-        CombinedReward(
-            (
+        super().__init__(
+            reward_functions=(
                 distrib_reward,
                 AboveCrossbar(),
                 SaveBoostReward(),
@@ -69,7 +64,7 @@ class MyRewardFunction(RewardFunction):
                     demo=self.demo_w,
                 ),
             ),
-            (
+            reward_weights=(
                 1.0,
                 self.above_w,
                 self.save_boost_w,
@@ -141,4 +136,6 @@ class Demoed(RewardFunction):
     def get_reward(self, player: PlayerData, state: GameState, previous_action: np.ndarray) -> float:
         if player.is_demoed:
             return 1
+        else:
+            return 0
 
