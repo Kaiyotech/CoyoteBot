@@ -4,10 +4,82 @@ from rlgym.utils import math
 from rlgym.utils.common_values import BLUE_TEAM, BLUE_GOAL_BACK, ORANGE_GOAL_BACK, ORANGE_TEAM, BALL_MAX_SPEED, \
     CAR_MAX_SPEED, BALL_RADIUS
 from rlgym.utils.gamestates import GameState, PlayerData
-from rlgym.utils.reward_functions import RewardFunction
+
 from rlgym.utils.math import cosine_similarity
 
+from rlgym.utils.reward_functions.common_rewards.player_ball_rewards import VelocityPlayerToBallReward
+from rlgym.utils.reward_functions.common_rewards.ball_goal_rewards import VelocityBallToGoalReward
+from rlgym.utils.reward_functions.common_rewards.misc_rewards import *
+from rlgym.utils.reward_functions import RewardFunction, CombinedReward
+from rlgym_tools.extra_rewards.distribute_rewards import DistributeRewards
+
 APRX_CROSSBAR_HEIGHT = 640
+
+
+class MyRewardFunction(RewardFunction):
+    def __init__(
+            self,
+            team_spirit=0.2,
+            goal_w=10,
+            shot_w=0.2,
+            save_w=5,
+            demo_w=5,
+            above_w=0.05,
+            got_demoed_w=-6,
+            behind_ball_w=0.01,
+            save_boost_w=0.03,
+            concede_w=-5,
+            velocity_w=0.8,
+            velocity_pb_w=0.5,
+            velocity_bg_w=0.6,
+    ):
+        self.team_spirit = team_spirit
+        self.goal_w = goal_w
+        self.shot_w = shot_w
+        self.save_w = save_w
+        self.demo_w = demo_w
+        self.above_w = above_w
+        self.got_demoed_w = got_demoed_w
+        self.behind_ball_w = behind_ball_w
+        self.save_boost_w = save_boost_w
+        self.concede_w = concede_w
+        self.velocity_w = velocity_w
+        self.velocity_pb_w = velocity_pb_w
+        self.velocity_bg_w = velocity_bg_w
+        self.rewards = None
+
+    def reset(self, initial_state: GameState):
+        pass
+
+    def get_reward(self, player: PlayerData, state: GameState, previous_action: np.ndarray):
+        goal_reward = EventReward(goal=self.goal_w, concede=self.concede_w)
+        distrib_reward = DistributeRewards(goal_reward, team_spirit=self.team_spirit)
+        CombinedReward(
+            (
+                distrib_reward,
+                AboveCrossbar(),
+                SaveBoostReward(),
+                VelocityReward(),
+                VelocityPlayerToBallReward(),
+                VelocityBallToGoalReward(),
+                Demoed(),
+                EventReward(
+                    shot=self.shot_w,
+                    save=self.save_w,
+                    demo=self.demo_w,
+                ),
+            ),
+            (
+                1.0,
+                self.above_w,
+                self.save_boost_w,
+                self.velocity_w,
+                self.velocity_pb_w,
+                self.velocity_bg_w,
+                self.got_demoed_w,
+                1.0,
+            )
+        )
 
 
 class AboveCrossbar(RewardFunction):

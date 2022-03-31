@@ -1,21 +1,17 @@
-from rlgym.envs import Match
-from rlgym.utils.action_parsers import DiscreteAction
 from stable_baselines3 import PPO
 from stable_baselines3.common.callbacks import CheckpointCallback
 from stable_baselines3.common.vec_env import VecMonitor, VecNormalize, VecCheckNan
 from stable_baselines3.ppo import MlpPolicy
 
+from rlgym.utils.action_parsers import DiscreteAction
 from rlgym.utils.obs_builders import AdvancedObs
 from rlgym.utils.state_setters import DefaultState
 from rlgym.utils.terminal_conditions.common_conditions import TimeoutCondition, GoalScoredCondition
 from rlgym_tools.sb3_utils import SB3MultipleInstanceEnv
-from rlgym.utils.reward_functions.common_rewards.misc_rewards import *
-from rlgym.utils.reward_functions.common_rewards.misc_rewards import SaveBoostReward
-from rlgym.utils.reward_functions.common_rewards.player_ball_rewards import VelocityPlayerToBallReward
-from rlgym.utils.reward_functions.common_rewards.ball_goal_rewards import VelocityBallToGoalReward
-# from rlgym.utils.reward_functions.common_rewards.conditional_rewards import RewardIfBehindBall
-from rlgym.utils.reward_functions import CombinedReward
-from mybots_utils.mybots_rewards import *
+from rlgym_tools.extra_rewards.anneal_rewards import AnnealRewards
+from rlgym.envs import Match
+
+from mybots_utils.mybots_rewards import MyRewardFunction
 
 from os.path import exists
 
@@ -45,35 +41,53 @@ if __name__ == '__main__':  # Required for multiprocessing
     print(f"time per step={t_step}, gamma={gamma})")
 
 
+    def anneal_rewards_fn():
+
+        max_steps = 50_000_000  # TODO tune this some
+        # when annealing, change the weights between 1 and 2, 2 is new
+        reward1 = MyRewardFunction(
+                        team_spirit=0.3,
+                        goal_w=10,
+                        shot_w=0.2,
+                        save_w=5,
+                        demo_w=5,
+                        above_w=0.05,
+                        got_demoed_w=-6,
+                        behind_ball_w=0.01,
+                        save_boost_w=0.03,
+                        concede_w=-5,
+                        velocity_w=0.8,
+                        velocity_pb_w=0.5,
+                        velocity_bg_w=0.6,
+                        )
+        reward2 = MyRewardFunction(
+                        team_spirit=0.3,
+                        goal_w=10,
+                        shot_w=0.2,
+                        save_w=5,
+                        demo_w=5,
+                        above_w=0.05,
+                        got_demoed_w=-6,
+                        behind_ball_w=0.01,
+                        save_boost_w=0.03,
+                        concede_w=-5,
+                        velocity_w=0.8,
+                        velocity_pb_w=0.5,
+                        velocity_bg_w=0.6,
+                        )
+
+        alternating_rewards_steps = [reward1, max_steps, reward2]
+
+        return AnnealRewards(*alternating_rewards_steps, mode=AnnealRewards.STEP)
+
     def get_match():  # Need to use a function so that each instance can call it and produce their own objects
         return Match(
             team_size=agents_per_match // 2,
             tick_skip=frame_skip,
-            reward_function=CombinedReward(
-                (
-                    # TODO anneal when adding complexity
-                    # TODO add team spirit
-                    # AboveCrossbar(),
-                    # OnWall(),
-                    # SaveBoostReward(),
-                    # RewardIfBehindBall(),
-                    VelocityReward(),
-                    VelocityPlayerToBallReward(),
-                    VelocityBallToGoalReward(),
-                    # Demoed(),
-                    EventReward(
-                        team_goal=100.0,
-                        concede=0,  # add later
-                        shot=20.0,
-                        save=0,  # add later
-                        demo=0,  # add later
-                    ),
-                ),
-                (0.8, 0.5, 0.6, 1.0)
-            ),
+            reward_function=anneal_rewards_fn(),
             self_play=True,
             terminal_conditions=[TimeoutCondition(round(30 // t_step)), GoalScoredCondition()],  # TODO lengthen later
-            obs_builder=AdvancedObs(),  # Not that advanced, good default
+            obs_builder=AdvancedObs(),
             state_setter=DefaultState(),  # Resets to kickoff position
             action_parser=DiscreteAction(n_bins=n_bins)
         )
@@ -98,7 +112,7 @@ if __name__ == '__main__':  # Required for multiprocessing
             activation_fn=ReLU,
             net_arch=[512, dict(pi=[256, 256], vf=[512, 512])],
         )
-        model = PPO( # TODO initialize with zero mean, low deviation, xavier?
+        model = PPO(
             MlpPolicy,
             env,
             n_epochs=n_epochs,
@@ -114,7 +128,6 @@ if __name__ == '__main__':  # Required for multiprocessing
             tensorboard_log="logs",  # `tensorboard --logdir out/logs` in terminal to see graphs
             device="auto"  # Uses GPU if available
         )
-        # TODO figure out how to initialize
 
     # Save model every so often
     # Divide by num_envs (number of agents) because callback only increments every time all agents have taken a step
