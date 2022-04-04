@@ -3,15 +3,17 @@ from stable_baselines3.common.callbacks import CheckpointCallback
 from stable_baselines3.common.vec_env import VecMonitor, VecNormalize, VecCheckNan
 from stable_baselines3.ppo import MlpPolicy
 
-from rlgym.utils.action_parsers import DiscreteAction
-from rlgym.utils.obs_builders import AdvancedObs
-from rlgym.utils.state_setters import DefaultState
+from rlgym_tools.extra_action_parsers.kbm_act import KBMAction
+from rlgym_tools.extra_obs.advanced_stacker import AdvancedStacker
+from rlgym_tools.extra_state_setters.weighted_sample_setter import WeightedSampleSetter  # TODO add later
 from rlgym.utils.terminal_conditions.common_conditions import TimeoutCondition, GoalScoredCondition
 from rlgym_tools.sb3_utils import SB3MultipleInstanceEnv
 from rlgym_tools.extra_rewards.anneal_rewards import AnnealRewards
 from rlgym.envs import Match
 
 from mybots_utils.mybots_rewards import MyRewardFunction
+from mybots_utils.mybots_statesets import *
+from mybots_utils.mybots_terminals import *
 
 from os.path import exists
 
@@ -30,51 +32,53 @@ if __name__ == '__main__':  # Required for multiprocessing
     learning_rate = 5e-5
     ent_coef = 0.01
     vf_coef = 1.
-    target_steps = 6_000_000  # steps to do per rollout
-    agents_per_match = 6
+    target_steps = 2_000_000  # steps to do per rollout
+    agents_per_match = 2
     num_instances = 10
     steps = target_steps // (num_instances * agents_per_match)
     batch_size = steps // 5
-    n_bins = 101
+    n_bins = 3
     n_epochs = 10
 
     print(f"time per step={t_step}, gamma={gamma})")
 
 
-    def anneal_rewards_fn():
+    def anneal_rewards_fn():  # TODO this is throwing an error
 
-        max_steps = 50_000_000  # TODO tune this some
+        max_steps = 100_000_000  # TODO tune this some
         # when annealing, change the weights between 1 and 2, 2 is new
         reward1 = MyRewardFunction(
-                        team_spirit=0.3,
+                        team_spirit=0,
                         goal_w=10,
-                        shot_w=0.2,
+                        shot_w=5,
                         save_w=5,
-                        demo_w=5,
-                        above_w=0.05,
-                        got_demoed_w=-6,
-                        behind_ball_w=0.01,
+                        demo_w=0,
+                        above_w=0,
+                        got_demoed_w=0,
+                        behind_ball_w=0,
                         save_boost_w=0.03,
-                        concede_w=-5,
-                        velocity_w=0.8,
-                        velocity_pb_w=0.5,
-                        velocity_bg_w=0.6,
-                        )
+                        concede_w=0,
+                        velocity_w=0,
+                        velocity_pb_w=0,
+                        velocity_bg_w=0.5,
+                        ball_touch_w=4,
+                    ),
         reward2 = MyRewardFunction(
-                        team_spirit=0.3,
+                        team_spirit=0,
                         goal_w=10,
-                        shot_w=0.2,
+                        shot_w=5,
                         save_w=5,
-                        demo_w=5,
-                        above_w=0.05,
-                        got_demoed_w=-6,
-                        behind_ball_w=0.01,
+                        demo_w=0,
+                        above_w=0,
+                        got_demoed_w=0,
+                        behind_ball_w=0,
                         save_boost_w=0.03,
-                        concede_w=-5,
-                        velocity_w=0.8,
-                        velocity_pb_w=0.5,
-                        velocity_bg_w=0.6,
-                        )
+                        concede_w=0,
+                        velocity_w=0,
+                        velocity_pb_w=0,
+                        velocity_bg_w=0.5,
+                        ball_touch_w=4,
+                    ),
 
         alternating_rewards_steps = [reward1, max_steps, reward2]
 
@@ -84,12 +88,30 @@ if __name__ == '__main__':  # Required for multiprocessing
         return Match(
             team_size=agents_per_match // 2,
             tick_skip=frame_skip,
-            reward_function=anneal_rewards_fn(),
+            reward_function=MyRewardFunction(
+                        team_spirit=0,
+                        goal_w=10,
+                        shot_w=5,
+                        save_w=5,
+                        demo_w=0,
+                        above_w=0,
+                        got_demoed_w=0,
+                        behind_ball_w=0,
+                        save_boost_w=0.03,
+                        concede_w=0,
+                        velocity_w=0,
+                        velocity_pb_w=0,
+                        velocity_bg_w=0.5,
+                        ball_touch_w=4,
+                    ),
             self_play=True,
-            terminal_conditions=[TimeoutCondition(round(30 // t_step)), GoalScoredCondition()],  # TODO lengthen later
-            obs_builder=AdvancedObs(),
-            state_setter=DefaultState(),  # Resets to kickoff position
-            action_parser=DiscreteAction(n_bins=n_bins)
+            terminal_conditions=[TimeoutCondition(round(250 // t_step)),  # TODO lengthen later
+                                 GoalScoredCondition(),
+                                 BallTouchGroundCondition()],
+            obs_builder=AdvancedStacker(6),
+            state_setter=WallDribble(),
+            action_parser=KBMAction(n_bins=n_bins),
+            game_speed=100,  # TODO set this back to 100 after testing
         )
 
 
@@ -110,7 +132,7 @@ if __name__ == '__main__':  # Required for multiprocessing
     else:
         policy_kwargs = dict(
             activation_fn=ReLU,
-            net_arch=[512, dict(pi=[256, 256], vf=[512, 512])],
+            net_arch=[512, 512, dict(pi=[256, 256, 256], vf=[256, 256, 256])],
         )
         model = PPO(
             MlpPolicy,
@@ -132,12 +154,12 @@ if __name__ == '__main__':  # Required for multiprocessing
     # Save model every so often
     # Divide by num_envs (number of agents) because callback only increments every time all agents have taken a step
     # This saves to specified folder with a specified name
-    callback = CheckpointCallback(round(18_000_000 / env.num_envs),
+    callback = CheckpointCallback(round(10_000_000 / env.num_envs),
                                   save_path="models",
                                   name_prefix="rl_model",
                                   )
 
     while True:
-        model.learn(36_000_000, callback=callback, reset_num_timesteps=False)
+        model.learn(20_000_000, callback=callback, reset_num_timesteps=False)
         model.save("models/exit_save")
         model.save(f"mmr_models/{model.num_timesteps}")

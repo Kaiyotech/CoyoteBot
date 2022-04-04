@@ -2,7 +2,7 @@ import numpy as np
 
 from rlgym.utils import math
 from rlgym.utils.common_values import BLUE_TEAM, BLUE_GOAL_BACK, ORANGE_GOAL_BACK, ORANGE_TEAM, BALL_MAX_SPEED, \
-    CAR_MAX_SPEED, BALL_RADIUS
+    CAR_MAX_SPEED, BALL_RADIUS, GOAL_HEIGHT
 from rlgym.utils.gamestates import GameState, PlayerData
 
 from rlgym.utils.math import cosine_similarity
@@ -10,10 +10,9 @@ from rlgym.utils.math import cosine_similarity
 from rlgym.utils.reward_functions.common_rewards.player_ball_rewards import VelocityPlayerToBallReward
 from rlgym.utils.reward_functions.common_rewards.ball_goal_rewards import VelocityBallToGoalReward
 from rlgym.utils.reward_functions.common_rewards.misc_rewards import *
+from rlgym.utils.reward_functions.common_rewards.conditional_rewards import *
 from rlgym.utils.reward_functions import RewardFunction, CombinedReward
 from rlgym_tools.extra_rewards.distribute_rewards import DistributeRewards
-
-APRX_CROSSBAR_HEIGHT = 640
 
 
 class MyRewardFunction(CombinedReward):
@@ -32,6 +31,7 @@ class MyRewardFunction(CombinedReward):
             velocity_w=0.8,
             velocity_pb_w=0.5,
             velocity_bg_w=0.6,
+            ball_touch_w=1,
     ):
         self.team_spirit = team_spirit
         self.goal_w = goal_w
@@ -46,6 +46,7 @@ class MyRewardFunction(CombinedReward):
         self.velocity_w = velocity_w
         self.velocity_pb_w = velocity_pb_w
         self.velocity_bg_w = velocity_bg_w
+        self.ball_touch_w = ball_touch_w
         # self.rewards = None
         goal_reward = EventReward(goal=self.goal_w, concede=self.concede_w)
         distrib_reward = DistributeRewards(goal_reward, team_spirit=self.team_spirit)
@@ -63,6 +64,7 @@ class MyRewardFunction(CombinedReward):
                     save=self.save_w,
                     demo=self.demo_w,
                 ),
+                RewardPerTouch(),
             ),
             reward_weights=(
                 1.0,
@@ -73,8 +75,20 @@ class MyRewardFunction(CombinedReward):
                 self.velocity_bg_w,
                 self.got_demoed_w,
                 1.0,
+                self.ball_touch_w,
             )
         )
+
+
+class RewardPerTouch(RewardFunction):
+    def reset(self, initial_state: GameState):
+        pass
+
+    def get_reward(self, player: PlayerData, state: GameState, previous_action: np.ndarray) -> float:
+        if state.last_touch == player.car_id:
+            return 1
+        else:
+            return 0
 
 
 class AboveCrossbar(RewardFunction):
@@ -93,7 +107,7 @@ class AboveCrossbar(RewardFunction):
         pos = player.car_data.position
         # not above crossbar
         car_z = pos[2]
-        if car_z < APRX_CROSSBAR_HEIGHT:
+        if car_z < GOAL_HEIGHT:
             return 0
 
         # from player_ball_rewards rlgym
