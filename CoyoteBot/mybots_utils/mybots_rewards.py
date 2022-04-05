@@ -90,6 +90,30 @@ class RewardPerTouch(RewardFunction):
         else:
             return 0
 
+# TODO better reward per touch maybe, grows with consecutive touches? How to implement?
+# class RewardPerTouch(RewardFunction):
+#     """
+#     Rewards consecutive touches
+#     :param decay_prev_touches: decay to apply to previous touches
+#     :param max_touches_reward: maximum reward to give regardless of consecutive touches
+#     """
+#
+#     def __init__(self, decay_prev_touches=0.8, max_touches_reward=20):
+#         self.decay_prev_touches = decay_prev_touches
+#         self.max_touches_reward = max_touches_reward
+#         self.rew_prev_touches = 0
+#
+#     def reset(self, initial_state: GameState):
+#         self.rew_prev_touches = 0
+#
+#     def get_reward(self, player: PlayerData, state: GameState, previous_action: np.ndarray) -> float:
+#         if state.last_touch == player.car_id:
+#             self.rew_prev_touches += 1 + self.rew_prev_touches * self.decay_prev_touches
+#         else:
+#             self.rew_prev_touches = 0
+#
+#         return min(self.rew_prev_touches, self.max_touches_reward)
+
 
 class AboveCrossbar(RewardFunction):
     # reward function if above the crossbar and near the ball

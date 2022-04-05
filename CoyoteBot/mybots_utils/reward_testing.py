@@ -35,10 +35,10 @@ try:
             # Here we sample a random action. If you have an agent, you would get an action from it here.
             action = env.action_space.sample()
 
-            next_obs, reward, done, gameinfo = env.step([1, 0, 0, 0, 0, 0, 0, 0])
+            next_obs, reward, done, gameinfo = env.step(action)
 
             if reward > 0:
-                print(reward)
+                # print(reward)
                 pass
 
             obs = next_obs

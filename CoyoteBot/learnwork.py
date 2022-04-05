@@ -112,11 +112,14 @@ if __name__ == '__main__':  # Required for multiprocessing
             state_setter=WallDribble(),
             action_parser=KBMAction(n_bins=n_bins),
             game_speed=100,  # TODO set this back to 100 after testing
+
         )
 
 
     env = SB3MultipleInstanceEnv(match_func_or_matches=get_match,
-                                 num_instances=num_instances)
+                                 num_instances=num_instances,
+                                 wait_time=60,
+                                 )
     env = VecCheckNan(env)  # Optional
     env = VecMonitor(env)  # Recommended, logs mean reward and ep_len to Tensorboard
     env = VecNormalize(env, norm_obs=False, gamma=gamma)  # Highly recommended, normalizes rewards
