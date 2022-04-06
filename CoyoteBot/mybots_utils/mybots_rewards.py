@@ -64,6 +64,71 @@ class MyRewardFunction(CombinedReward):
                     save=self.save_w,
                     demo=self.demo_w,
                 ),
+                IncreaseRewardPerTouch(),
+            ),
+            reward_weights=(
+                1.0,
+                self.above_w,
+                self.save_boost_w,
+                self.velocity_w,
+                self.velocity_pb_w,
+                self.velocity_bg_w,
+                self.got_demoed_w,
+                1.0,
+                self.ball_touch_w,
+            )
+        )
+
+
+class MyOldRewardFunction(CombinedReward):
+    def __init__(
+            self,
+            team_spirit=0.2,
+            goal_w=10,
+            shot_w=0.2,
+            save_w=5,
+            demo_w=5,
+            above_w=0.05,
+            got_demoed_w=-6,
+            behind_ball_w=0.01,
+            save_boost_w=0.03,
+            concede_w=-5,
+            velocity_w=0.8,
+            velocity_pb_w=0.5,
+            velocity_bg_w=0.6,
+            ball_touch_w=4,
+    ):
+        self.team_spirit = team_spirit
+        self.goal_w = goal_w
+        self.shot_w = shot_w
+        self.save_w = save_w
+        self.demo_w = demo_w
+        self.above_w = above_w
+        self.got_demoed_w = got_demoed_w
+        self.behind_ball_w = behind_ball_w
+        self.save_boost_w = save_boost_w
+        self.concede_w = concede_w
+        self.velocity_w = velocity_w
+        self.velocity_pb_w = velocity_pb_w
+        self.velocity_bg_w = velocity_bg_w
+        self.ball_touch_w = ball_touch_w
+        # self.rewards = None
+        goal_reward = EventReward(goal=self.goal_w, concede=self.concede_w)
+        distrib_reward = DistributeRewards(goal_reward, team_spirit=self.team_spirit)
+        super().__init__(
+            reward_functions=(
+                distrib_reward,
+                AboveCrossbar(),
+                SaveBoostReward(),
+                VelocityReward(),
+                VelocityPlayerToBallReward(),
+                VelocityBallToGoalReward(),
+                Demoed(),
+                EventReward(
+                    shot=self.shot_w,
+                    save=self.save_w,
+                    demo=self.demo_w,
+                ),
                 RewardPerTouch(),
             ),
             reward_weights=(
@@ -90,29 +155,31 @@ class RewardPerTouch(RewardFunction):
         else:
             return 0
 
-# TODO better reward per touch maybe, grows with consecutive touches? How to implement?
-# class RewardPerTouch(RewardFunction):
-#     """
-#     Rewards consecutive touches
-#     :param decay_prev_touches: decay to apply to previous touches
-#     :param max_touches_reward: maximum reward to give regardless of consecutive touches
-#     """
-#
-#     def __init__(self, decay_prev_touches=0.8, max_touches_reward=20):
-#         self.decay_prev_touches = decay_prev_touches
-#         self.max_touches_reward = max_touches_reward
-#         self.rew_prev_touches = 0
-#
-#     def reset(self, initial_state: GameState):
-#         self.rew_prev_touches = 0
-#
-#     def get_reward(self, player: PlayerData, state: GameState, previous_action: np.ndarray) -> float:
-#         if state.last_touch == player.car_id:
-#             self.rew_prev_touches += 1 + self.rew_prev_touches * self.decay_prev_touches
-#         else:
-#             self.rew_prev_touches = 0
-#
-#         return min(self.rew_prev_touches, self.max_touches_reward)
+
+class IncreaseRewardPerTouch(RewardFunction):
+    """
+    Rewards consecutive touches
+    :param exp_base: exp_base^n where n is consecutive touches
+    :param max_touches_reward: maximum reward to give regardless of consecutive touches
+    """
+
+    def __init__(self, exp_base=1.06, max_touches_reward=20):
+        self.exp_base = exp_base
+        self.max_touches_reward = max_touches_reward
+        self.num_touches = 0
+
+    def reset(self, initial_state: GameState):
+        self.num_touches = 0
+
+    def get_reward(self, player: PlayerData, state: GameState, previous_action: np.ndarray) -> float:
+        if state.last_touch == player.car_id:
+            self.num_touches += 1
+            reward = self.exp_base ** self.num_touches
+            return min(reward, self.max_touches_reward)
+
+        else:
+            self.num_touches = 0
+            return 0
 
 
 class AboveCrossbar(RewardFunction):

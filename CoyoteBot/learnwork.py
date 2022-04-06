@@ -11,7 +11,7 @@ from rlgym_tools.sb3_utils import SB3MultipleInstanceEnv
 from rlgym_tools.extra_rewards.anneal_rewards import AnnealRewards
 from rlgym.envs import Match
 
-from mybots_utils.mybots_rewards import MyRewardFunction
+from mybots_utils.mybots_rewards import MyRewardFunction, MyOldRewardFunction
 from mybots_utils.mybots_statesets import *
 from mybots_utils.mybots_terminals import *
 
@@ -32,22 +32,22 @@ if __name__ == '__main__':  # Required for multiprocessing
     learning_rate = 5e-5
     ent_coef = 0.01
     vf_coef = 1.
-    target_steps = 2_000_000  # steps to do per rollout
+    target_steps = 2_400_000  # steps to do per rollout
     agents_per_match = 2
-    num_instances = 10
+    num_instances = 12
     steps = target_steps // (num_instances * agents_per_match)
-    batch_size = steps // 5
+    batch_size = steps // 4
     n_bins = 3
     n_epochs = 10
 
     print(f"time per step={t_step}, gamma={gamma})")
 
 
-    def anneal_rewards_fn():  # TODO this is throwing an error
+    def anneal_rewards_fn():
 
-        max_steps = 100_000_000  # TODO tune this some
+        max_steps = 50_000_000  # TODO tune this some
         # when annealing, change the weights between 1 and 2, 2 is new
-        reward1 = MyRewardFunction(
+        reward1 = MyOldRewardFunction(
                         team_spirit=0,
                         goal_w=10,
                         shot_w=5,
@@ -62,10 +62,11 @@ if __name__ == '__main__':  # Required for multiprocessing
                         velocity_pb_w=0,
                         velocity_bg_w=0.5,
                         ball_touch_w=4,
-                    ),
+                    )
+
         reward2 = MyRewardFunction(
                         team_spirit=0,
-                        goal_w=10,
+                        goal_w=20,
                         shot_w=5,
                         save_w=5,
                         demo_w=0,
@@ -75,10 +76,10 @@ if __name__ == '__main__':  # Required for multiprocessing
                         save_boost_w=0.03,
                         concede_w=0,
                         velocity_w=0,
-                        velocity_pb_w=0,
-                        velocity_bg_w=0.5,
-                        ball_touch_w=4,
-                    ),
+                        velocity_pb_w=0.2,
+                        velocity_bg_w=0.75,
+                        ball_touch_w=1,
+                    )
 
         alternating_rewards_steps = [reward1, max_steps, reward2]
 
@@ -88,28 +89,17 @@ if __name__ == '__main__':  # Required for multiprocessing
         return Match(
             team_size=agents_per_match // 2,
             tick_skip=frame_skip,
-            reward_function=MyRewardFunction(
-                        team_spirit=0,
-                        goal_w=10,
-                        shot_w=5,
-                        save_w=5,
-                        demo_w=0,
-                        above_w=0,
-                        got_demoed_w=0,
-                        behind_ball_w=0,
-                        save_boost_w=0.03,
-                        concede_w=0,
-                        velocity_w=0,
-                        velocity_pb_w=0,
-                        velocity_bg_w=0.5,
-                        ball_touch_w=4,
-                    ),
+            reward_function=anneal_rewards_fn(),
             self_play=True,
-            terminal_conditions=[TimeoutCondition(round(250 // t_step)),  # TODO lengthen later
+            terminal_conditions=[TimeoutCondition(round(30 // t_step)),  # TODO lengthen later
                                  GoalScoredCondition(),
                                  BallTouchGroundCondition()],
             obs_builder=AdvancedStacker(6),
-            state_setter=WallDribble(),
+            state_setter=AugmentSetter(WallDribble(),
+                                       shuffle_within_teams=True,
+                                       swap_front_back=False,
+                                       swap_left_right=False
+                                       ),
             action_parser=KBMAction(n_bins=n_bins),
             game_speed=100,  # TODO set this back to 100 after testing
 
@@ -118,7 +108,7 @@ if __name__ == '__main__':  # Required for multiprocessing
 
     env = SB3MultipleInstanceEnv(match_func_or_matches=get_match,
                                  num_instances=num_instances,
-                                 wait_time=60,
+                                 wait_time=90,
                                  )
     env = VecCheckNan(env)  # Optional
     env = VecMonitor(env)  # Recommended, logs mean reward and ep_len to Tensorboard
@@ -157,12 +147,12 @@ if __name__ == '__main__':  # Required for multiprocessing
     # Save model every so often
     # Divide by num_envs (number of agents) because callback only increments every time all agents have taken a step
     # This saves to specified folder with a specified name
-    callback = CheckpointCallback(round(10_000_000 / env.num_envs),
+    callback = CheckpointCallback(round(7_200_000 / env.num_envs),
                                   save_path="models",
                                   name_prefix="rl_model",
                                   )
 
     while True:
-        model.learn(20_000_000, callback=callback, reset_num_timesteps=False)
+        model.learn(21_600_000, callback=callback, reset_num_timesteps=False)
         model.save("models/exit_save")
         model.save(f"mmr_models/{model.num_timesteps}")
