@@ -20,6 +20,8 @@ class MyOldRewardFunction(CombinedReward):
             self,
             team_spirit=0.2,
             goal_w=10,
+            aerial_goal_w=25,
+            double_tap_goal_w=75,
             shot_w=0.2,
             save_w=5,
             demo_w=5,
@@ -35,6 +37,8 @@ class MyOldRewardFunction(CombinedReward):
     ):
         self.team_spirit = team_spirit
         self.goal_w = goal_w
+        self.aerial_goal_w = aerial_goal_w
+        self.double_tap_goal_w = double_tap_goal_w
         self.shot_w = shot_w
         self.save_w = save_w
         self.demo_w = demo_w
@@ -64,7 +68,9 @@ class MyOldRewardFunction(CombinedReward):
                     save=self.save_w,
                     demo=self.demo_w,
                 ),
-                IncreaseRewardPerTouch(),
+                AerialRewardPerTouch(exp_base=1.08, max_touches_reward=50),
+                AerialGoalReward(),
+                DoubleTapReward(),
             ),
             reward_weights=(
                 1.0,
@@ -76,6 +82,8 @@ class MyOldRewardFunction(CombinedReward):
                 self.got_demoed_w,
                 1.0,
                 self.ball_touch_w,
+                self.aerial_goal_w,
+                self.double_tap_goal_w,
             )
         )
 
@@ -133,7 +141,7 @@ class MyRewardFunction(CombinedReward):
                     save=self.save_w,
                     demo=self.demo_w,
                 ),
-                AerialRewardPerTouch(exp_base=1.08, max_touches_reward=50),
+                AerialRewardPerTouch(exp_base=1.75, max_touches_reward=50),
                 AerialGoalReward(),
                 DoubleTapReward(),
             ),
