@@ -34,7 +34,7 @@ class WallDribble(StateSetter):
         x_choice = rand.choice([0, 2]) - 1
         rand_x = x_choice * (SIDE_WALL_X - 17)
         rand_y = rng.uniform(-BACK_WALL_Y + 1300, BACK_WALL_Y - 1300)
-        rand_z = rng.uniform(325, CEILING_Z - 1400)
+        rand_z = rng.uniform(100, 300)
         desired_car_pos = [rand_x, rand_y, rand_z]  # x, y, z
         desired_pitch = (90 + orange_fix * (rng.uniform(-20, -5))) * DEG_TO_RAD
         desired_yaw = 90 * DEG_TO_RAD
@@ -67,7 +67,7 @@ class WallDribble(StateSetter):
 
             # put the defense car in front of net
             elif car.id == car_defend.id:
-                car.set_pos(rng.uniform(-1600, 1600), orange_fix * rng.uniform(3800, 5100), 0)
+                car.set_pos(rng.uniform(-1600, 1600), orange_fix * rng.uniform(3800, 5000), 0)
                 car.set_rot(0, rng.uniform(-180, 180) * (np.pi / 180), 0)
                 car.boost = 0.33
                 continue

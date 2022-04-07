@@ -15,7 +15,7 @@ from rlgym.utils.reward_functions import RewardFunction, CombinedReward
 from rlgym_tools.extra_rewards.distribute_rewards import DistributeRewards
 
 
-class MyRewardFunction(CombinedReward):
+class MyOldRewardFunction(CombinedReward):
     def __init__(
             self,
             team_spirit=0.2,
@@ -80,11 +80,13 @@ class MyRewardFunction(CombinedReward):
         )
 
 
-class MyOldRewardFunction(CombinedReward):
+class MyRewardFunction(CombinedReward):
     def __init__(
             self,
             team_spirit=0.2,
             goal_w=10,
+            aerial_goal_w=25,
+            double_tap_goal_w=75,
             shot_w=0.2,
             save_w=5,
             demo_w=5,
@@ -96,10 +98,12 @@ class MyOldRewardFunction(CombinedReward):
             velocity_w=0.8,
             velocity_pb_w=0.5,
             velocity_bg_w=0.6,
-            ball_touch_w=4,
+            ball_touch_w=1,
     ):
         self.team_spirit = team_spirit
         self.goal_w = goal_w
+        self.aerial_goal_w = aerial_goal_w
+        self.double_tap_goal_w = double_tap_goal_w
         self.shot_w = shot_w
         self.save_w = save_w
         self.demo_w = demo_w
@@ -129,7 +133,9 @@ class MyOldRewardFunction(CombinedReward):
                     save=self.save_w,
                     demo=self.demo_w,
                 ),
-                RewardPerTouch(),
+                AerialRewardPerTouch(exp_base=1.08, max_touches_reward=50),
+                AerialGoalReward(),
+                DoubleTapReward(),
             ),
             reward_weights=(
                 1.0,
@@ -141,17 +147,87 @@ class MyOldRewardFunction(CombinedReward):
                 self.got_demoed_w,
                 1.0,
                 self.ball_touch_w,
+                self.aerial_goal_w,
+                self.double_tap_goal_w,
             )
         )
 
 
-class RewardPerTouch(RewardFunction):
+class AerialGoalReward(RewardFunction):
+
+    def __init__(self):
+        self.last_touch_height = 0
+        self.last_goal = 0
+
     def reset(self, initial_state: GameState):
-        pass
+        self.last_touch_height = 0
+        self.last_goal = initial_state.blue_score
 
     def get_reward(self, player: PlayerData, state: GameState, previous_action: np.ndarray) -> float:
         if state.last_touch == player.car_id:
+            self.last_touch_height = player.car_data.position[2]
+
+        if self.last_touch_height > GOAL_HEIGHT and state.blue_score > self.last_goal:
             return 1
+
+        else:
+            return 0
+
+
+class DoubleTapReward(RewardFunction):
+
+    def __init__(self):
+        self.backboard_bounce = False
+        self.floor_bounce = False
+        self.last_goal = 0
+        self.last_ball_vel_y = 0
+
+    def reset(self, initial_state: GameState):
+        self.last_goal = initial_state.blue_score
+        self.backboard_bounce = False
+        self.floor_bounce = False
+        self.last_ball_vel_y = initial_state.ball.linear_velocity[1]
+
+    def get_reward(self, player: PlayerData, state: GameState, previous_action: np.ndarray) -> float:
+        if state.ball.position[2] < BALL_RADIUS * 2 and state.last_touch != player.car_id:
+            self.floor_bounce = True
+
+        elif 0.55 * self.last_ball_vel_y < state.ball.linear_velocity[1] > 0.65 * self.last_ball_vel_y and\
+                state.ball.position[1] > 4900 and state.ball.position[2] > 500:
+            self.backboard_bounce = True
+
+        if state.blue_score > self.last_goal and self.backboard_bounce and not self.floor_bounce:
+            return 1
+
+        else:
+            return 0
+
+
+class AerialRewardPerTouch(RewardFunction):
+    """
+        Rewards consecutive touches in the air
+        :param exp_base: exp_base^n where n is consecutive touches
+        :param max_touches_reward: maximum reward to give regardless of consecutive touches
+        """
+
+    def __init__(self, exp_base=1.06, max_touches_reward=20):
+        self.exp_base = exp_base
+        self.max_touches_reward = max_touches_reward
+        self.num_touches = 0
+
+    def reset(self, initial_state: GameState):
+        self.num_touches = 0
+
+    def get_reward(self, player: PlayerData, state: GameState, previous_action: np.ndarray) -> float:
+        if state.last_touch == player.car_id and state.ball.position[2] > 300:
+            self.num_touches += 1
+            reward = self.exp_base ** self.num_touches
+            return min(reward, self.max_touches_reward)
+
+        elif state.ball.position[2] <= 300:
+            self.num_touches = 0
+            return 0
+
         else:
             return 0
 

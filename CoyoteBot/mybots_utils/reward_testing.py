@@ -49,22 +49,7 @@ def anneal_rewards_fn():  # TODO this is throwing an error
 
 
 env = rlgym.make(
-        reward_fn=MyRewardFunction(
-                team_spirit=0,
-                goal_w=10,
-                shot_w=5,
-                save_w=5,
-                demo_w=0,
-                above_w=0,
-                got_demoed_w=0,
-                behind_ball_w=0,
-                save_boost_w=0.03,
-                concede_w=0,
-                velocity_w=0,
-                velocity_pb_w=0,
-                velocity_bg_w=0.5,
-                ball_touch_w=1,
-            ),
+        reward_fn=DoubleTapReward(),
         game_speed=1,
         state_setter=AugmentSetter(WallDribble(),
                                    shuffle_within_teams=True,
@@ -81,7 +66,8 @@ try:
         done = False
         while not done:
             # Here we sample a random action. If you have an agent, you would get an action from it here.
-            action = env.action_space.sample()
+            # action = env.action_space.sample()
+            action = [1, 0, 0, 0, 0, 0, 0, 0] * 2
 
             next_obs, reward, done, gameinfo = env.step(action)
 

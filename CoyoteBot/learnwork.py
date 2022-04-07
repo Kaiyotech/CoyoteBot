@@ -45,28 +45,11 @@ if __name__ == '__main__':  # Required for multiprocessing
 
     def anneal_rewards_fn():
 
-        max_steps = 50_000_000  # TODO tune this some
+        max_steps = 20_000_000  # TODO tune this some
         # when annealing, change the weights between 1 and 2, 2 is new
         reward1 = MyOldRewardFunction(
                         team_spirit=0,
                         goal_w=10,
-                        shot_w=5,
-                        save_w=5,
-                        demo_w=0,
-                        above_w=0,
-                        got_demoed_w=0,
-                        behind_ball_w=0,
-                        save_boost_w=0.03,
-                        concede_w=0,
-                        velocity_w=0,
-                        velocity_pb_w=0,
-                        velocity_bg_w=0.5,
-                        ball_touch_w=4,
-                    )
-
-        reward2 = MyRewardFunction(
-                        team_spirit=0,
-                        goal_w=20,
                         shot_w=5,
                         save_w=5,
                         demo_w=0,
@@ -81,6 +64,25 @@ if __name__ == '__main__':  # Required for multiprocessing
                         ball_touch_w=1,
                     )
 
+        reward2 = MyRewardFunction(
+                        team_spirit=0,
+                        goal_w=10,
+                        aerial_goal_w=25,
+                        double_tap_goal_w=75,
+                        shot_w=5,
+                        save_w=20,
+                        demo_w=0,
+                        above_w=0,
+                        got_demoed_w=0,
+                        behind_ball_w=0,
+                        save_boost_w=0.03,
+                        concede_w=-1,
+                        velocity_w=0.25,
+                        velocity_pb_w=0.8,
+                        velocity_bg_w=1.25,
+                        ball_touch_w=1,
+                    )
+
         alternating_rewards_steps = [reward1, max_steps, reward2]
 
         return AnnealRewards(*alternating_rewards_steps, mode=AnnealRewards.STEP)
@@ -91,9 +93,8 @@ if __name__ == '__main__':  # Required for multiprocessing
             tick_skip=frame_skip,
             reward_function=anneal_rewards_fn(),
             self_play=True,
-            terminal_conditions=[TimeoutCondition(round(30 // t_step)),  # TODO lengthen later
-                                 GoalScoredCondition(),
-                                 BallTouchGroundCondition()],
+            terminal_conditions=[TimeoutCondition(round(20 // t_step)),  # TODO lengthen later
+                                 GoalScoredCondition()],
             obs_builder=AdvancedStacker(6),
             state_setter=AugmentSetter(WallDribble(),
                                        shuffle_within_teams=True,
@@ -147,12 +148,12 @@ if __name__ == '__main__':  # Required for multiprocessing
     # Save model every so often
     # Divide by num_envs (number of agents) because callback only increments every time all agents have taken a step
     # This saves to specified folder with a specified name
-    callback = CheckpointCallback(round(7_200_000 / env.num_envs),
+    callback = CheckpointCallback(round(4_800_000 / env.num_envs),
                                   save_path="models",
                                   name_prefix="rl_model",
                                   )
 
     while True:
-        model.learn(21_600_000, callback=callback, reset_num_timesteps=False)
+        model.learn(14_400_000, callback=callback, reset_num_timesteps=False)
         model.save("models/exit_save")
         model.save(f"mmr_models/{model.num_timesteps}")
