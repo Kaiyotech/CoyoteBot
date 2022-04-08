@@ -47,11 +47,11 @@ if __name__ == '__main__':  # Required for multiprocessing
 
         max_steps = 20_000_000  # TODO tune this some
         # when annealing, change the weights between 1 and 2, 2 is new
-        reward1 = MyOldRewardFunction(
+        reward1 = MyRewardFunction(
             team_spirit=0,
             goal_w=10,
-            aerial_goal_w=25,
-            double_tap_goal_w=75,
+            aerial_goal_w=40,
+            double_tap_goal_w=125,
             shot_w=5,
             save_w=20,
             demo_w=0,
@@ -60,10 +60,10 @@ if __name__ == '__main__':  # Required for multiprocessing
             behind_ball_w=0,
             save_boost_w=0.03,
             concede_w=-1,
-            velocity_w=0.25,
-            velocity_pb_w=0.8,
-            velocity_bg_w=1.25,
-            ball_touch_w=1,
+            velocity_w=0.5,
+            velocity_pb_w=1,
+            velocity_bg_w=.75,
+            ball_touch_w=2,
         )
 
         reward2 = MyRewardFunction(
@@ -78,7 +78,7 @@ if __name__ == '__main__':  # Required for multiprocessing
             got_demoed_w=0,
             behind_ball_w=0,
             save_boost_w=0.03,
-            concede_w=-1,
+            concede_w=-5,
             velocity_w=0.5,
             velocity_pb_w=1,
             velocity_bg_w=.75,
@@ -111,7 +111,7 @@ if __name__ == '__main__':  # Required for multiprocessing
 
     env = SB3MultipleInstanceEnv(match_func_or_matches=get_match,
                                  num_instances=num_instances,
-                                 wait_time=90,
+                                 wait_time=30,
                                  )
     env = VecCheckNan(env)  # Optional
     env = VecMonitor(env)  # Recommended, logs mean reward and ep_len to Tensorboard
