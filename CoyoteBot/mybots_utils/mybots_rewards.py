@@ -182,6 +182,26 @@ class AerialGoalReward(RewardFunction):
             return 0
 
 
+class NonReward(RewardFunction):
+    def reset(self, initial_state: GameState):
+        pass
+
+    def get_reward(self, player: PlayerData, state: GameState, previous_action: np.ndarray) -> float:
+        return 0
+
+
+class UglyLandingPunish(RewardFunction):
+
+    def __init__(self):
+        pass
+
+    def reset(self, initial_state: GameState):
+        pass
+
+    def get_reward(self, player: PlayerData, state: GameState, previous_action: np.ndarray) -> float:
+        pass
+
+
 class DoubleTapReward(RewardFunction):
 
     def __init__(self):
@@ -327,4 +347,40 @@ class Demoed(RewardFunction):
             return 1
         else:
             return 0
+
+
+# TODO delete this
+class MyVelocityBallToGoalReward(RewardFunction):
+    def __init__(self, own_goal=False, use_scalar_projection=False):
+        super().__init__()
+        self.own_goal = own_goal
+        self.use_scalar_projection = use_scalar_projection
+
+    def reset(self, initial_state: GameState):
+        pass
+
+    def get_reward(self, player: PlayerData, state: GameState, previous_action: np.ndarray) -> float:
+        if player.team_num == BLUE_TEAM and not self.own_goal \
+                or player.team_num == ORANGE_TEAM and self.own_goal:
+            objective = np.array(ORANGE_GOAL_BACK)
+        else:
+            objective = np.array(BLUE_GOAL_BACK)
+
+        print(f"before is {state.ball.linear_velocity}")
+        vel = state.ball.linear_velocity # np.zeros(3)
+        print(f"velocity is {vel}")
+        print(f"after is {state.ball.linear_velocity}")
+
+        pos_diff = objective - state.ball.position
+        if self.use_scalar_projection:
+            # Vector version of v=d/t <=> t=d/v <=> 1/t=v/d
+            # Max value should be max_speed / ball_radius = 2300 / 94 = 24.5
+            # Used to guide the agent towards the ball
+            inv_t = math.scalar_projection(vel, pos_diff)
+            return inv_t
+        else:
+            # Regular component velocity
+            norm_pos_diff = pos_diff / np.linalg.norm(pos_diff)
+            vel /= BALL_MAX_SPEED
+            return float(np.dot(norm_pos_diff, vel))
 

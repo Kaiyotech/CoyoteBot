@@ -34,7 +34,7 @@ if __name__ == '__main__':  # Required for multiprocessing
     vf_coef = 1.
     target_steps = 2_400_000  # steps to do per rollout
     agents_per_match = 2
-    num_instances = 12
+    num_instances = 1
     steps = target_steps // (num_instances * agents_per_match)
     batch_size = steps // 4
     n_bins = 3
@@ -111,7 +111,7 @@ if __name__ == '__main__':  # Required for multiprocessing
 
     env = SB3MultipleInstanceEnv(match_func_or_matches=get_match,
                                  num_instances=num_instances,
-                                 wait_time=90,
+                                 wait_time=30,
                                  )
     env = VecCheckNan(env)  # Optional
     env = VecMonitor(env)  # Recommended, logs mean reward and ep_len to Tensorboard
